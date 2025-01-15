@@ -1,0 +1,6 @@
+[rhelai-1.2]
+name=RHEL AI 1.2 RHEL 9 RPMs
+baseurl=https://rhsm-pulp.corp.stage.redhat.com/content/dist/layered/rhel9/x86_64/rhelai/1.2/os
+enabled=1
+gpgcheck=1
+repo_gpgcheck=0

@@ -1,0 +1,9 @@
+[cuda-rhel9]
+name=CUDA RHEL 9
+#baseurl=https://internal.console.redhat.com/api/pulp-content/rhel-ai/cuda-rhel-9-$basearch/
+baseurl=https://developer.download.nvidia.com/compute/cuda/repos/rhel9/$basearch
+enabled=1
+gpgcheck=1
+# internal mirrors don't have signed metadata
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA-CUDA-9
