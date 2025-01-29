@@ -5,10 +5,6 @@ FROM ${BASE_IMAGE}
 ARG BASE_URL='https://us.download.nvidia.com/tesla'
 
 ARG VENDOR
-ARG INSTRUCTLAB_IMAGE
-LABEL vendor=${VENDOR} \
-      org.opencontainers.image.vendor=${VENDOR} \
-      INSTRUCTLAB_IMAGE=${INSTRUCTLAB_IMAGE}
 
 ARG DRIVER_TYPE=passthrough
 ENV NVIDIA_DRIVER_TYPE=${DRIVER_TYPE}
@@ -29,7 +25,6 @@ ENV DISABLE_VGPU_VERSION_CHECK=$DISABLE_VGPU_VERSION_CHECK
 USER root
 
 COPY repos/redhat.repo /etc/yum.repos.d/redhat.repo
-COPY repos/rhelai-1.2.repo /etc/yum.repos.d/rhelai-1.2.repo
 
 COPY repos/cuda-rhel9.repo /etc/yum.repos.d/cuda-rhel9.repo
 COPY repos/RPM-GPG-KEY-NVIDIA-CUDA-9 /etc/pki/rpm-gpg/RPM-GPG-KEY-NVIDIA-CUDA-9
@@ -60,7 +55,6 @@ RUN mv /etc/selinux /etc/selinux.tmp \
         cloud-init \
         git \
         git-lfs \
-        nvtop \
         pciutils \
         tmux \
         kmod-nvidia-${DRIVER_VERSION}-${KERNEL_VERSION}-${KERNEL_RELEASE} \
@@ -86,18 +80,8 @@ RUN mv /etc/selinux /etc/selinux.tmp \
         dnf module enable -y nvidia-driver:${DRIVER_BRANCH} && \
         dnf install -y nvidia-fabric-manager-${DRIVER_VERSION} libnvidia-nscq-${DRIVER_BRANCH}-${DRIVER_VERSION} ; \
     fi \
-    && . /etc/os-release && if [ "${ID}" == "rhel" ]; then \
-        # Install rhc connect for insights telemetry gathering
-        dnf install -y rhc rhc-worker-playbook; \
-        # Adding rhel ai identity to os-release file for insights usage
-        sed -i -e "/^VARIANT=/ {s/^VARIANT=.*/VARIANT=\"RHEL AI\"/; t}" -e "\$aVARIANT=\"RHEL AI\"" /usr/lib/os-release; \
-        sed -i -e "/^VARIANT_ID=/ {s/^VARIANT_ID=.*/VARIANT_ID=rhel_ai/; t}" -e "\$aVARIANT_ID=rhel_ai" /usr/lib/os-release; \
-        sed -i -e "/^RHEL_AI_VERSION_ID=/ {s/^RHEL_AI_VERSION_ID=.*/RHEL_AI_VERSION_ID='${IMAGE_VERSION_ID}'/; t}" -e "\$aRHEL_AI_VERSION_ID='${IMAGE_VERSION_ID}'" /usr/lib/os-release; \
-        # disable auto upgrade service
-        rm -f /usr/lib/systemd/system/default.target.wants/bootc-fetch-apply-updates.timer; \
-        fi \
+    && rm -f /usr/lib/systemd/system/default.target.wants/bootc-fetch-apply-updates.timer \
     && dnf clean all \
-    && ln -s ../cloud-init.target /usr/lib/systemd/system/default.target.wants \
     && mv /etc/selinux.tmp /etc/selinux \
     && ln -s /usr/lib/systemd/system/nvidia-toolkit-firstboot.service /usr/lib/systemd/system/basic.target.wants/nvidia-toolkit-firstboot.service \
     && echo "blacklist nouveau" > /etc/modprobe.d/blacklist_nouveau.conf \
@@ -122,27 +106,5 @@ RUN grep -q /usr/lib/containers/storage /etc/containers/storage.conf || \
     sed -i -e '/additionalimage.*/a "/usr/lib/containers/storage",' \
 	/etc/containers/storage.conf
 
-ARG INSTRUCTLAB_IMAGE_PULL_SECRET
-
-RUN for i in /usr/bin/ilab*; do \
-	sed -i 's/__REPLACE_TRAIN_DEVICE__/cuda/' $i;  \
-	sed -i 's/__REPLACE_CONTAINER_DEVICE__/nvidia.com\/gpu=all/' $i; \
-	sed -i "s%__REPLACE_IMAGE_NAME__%${INSTRUCTLAB_IMAGE}%" $i; \
-    done
-
-# Added for running as an OCI Container to prevent Overlay on Overlay issues.
-VOLUME /var/lib/containers
-
-RUN --mount=type=secret,id=${INSTRUCTLAB_IMAGE_PULL_SECRET}/.dockerconfigjson \
-    if [ -f "/run/.input/instructlab-nvidia/oci-layout" ]; then \
-         IID=$(podman --root /usr/lib/containers/storage pull oci:/run/.input/instructlab-nvidia) && \
-         podman --root /usr/lib/containers/storage image tag ${IID} ${INSTRUCTLAB_IMAGE}; \
-    elif [ -f "/run/secrets/${INSTRUCTLAB_IMAGE_PULL_SECRET}/.dockerconfigjson" ]; then \
-         IID=$(sudo podman --root /usr/lib/containers/storage pull --authfile /run/secrets/${INSTRUCTLAB_IMAGE_PULL_SECRET}/.dockerconfigjson ${INSTRUCTLAB_IMAGE}); \
-    else \
-         IID=$(sudo podman --root /usr/lib/containers/storage pull ${INSTRUCTLAB_IMAGE}); \
-    fi
-
-RUN podman system reset --force 2>/dev/null
 
 LABEL image_version_id="${IMAGE_VERSION_ID}"
